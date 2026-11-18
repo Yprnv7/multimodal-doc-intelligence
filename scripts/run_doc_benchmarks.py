@@ -7,9 +7,9 @@ import os
 import platform
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List
+
 import numpy as np
 
 from src.parser.layout_parser import LayoutParser
@@ -19,14 +19,19 @@ from src.retrieval.spatial_index import SpatialIndex
 from src.security.prompt_injection_guard import PromptInjectionGuard
 
 
-def get_hardware_info() -> Dict[str, str]:
+def get_hardware_info() -> dict[str, str]:
     cpu_model = platform.processor() or "Unknown"
     if platform.system() == "Darwin":
         try:
-            res = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True)
+            res = subprocess.run(
+                ["sysctl", "-n", "machdep.cpu.brand_string"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
             if res.returncode == 0 and res.stdout.strip():
                 cpu_model = res.stdout.strip()
-        except Exception:
+        except OSError:
             pass
 
     mem_bytes = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
@@ -40,8 +45,8 @@ def get_hardware_info() -> Dict[str, str]:
     }
 
 
-def benchmark_layout_parsing(num_spans: int = 1000) -> Dict[str, float]:
-    spans: List[TextSpan] = []
+def benchmark_layout_parsing(num_spans: int = 1000) -> dict[str, float]:
+    spans: list[TextSpan] = []
     for i in range(num_spans):
         page = (i // 50) + 1
         ymin = (i % 50) * 18
@@ -74,9 +79,9 @@ def benchmark_layout_parsing(num_spans: int = 1000) -> Dict[str, float]:
     }
 
 
-def benchmark_security_injection_guard(num_attacks: int = 100) -> Dict[str, float]:
+def benchmark_security_injection_guard(num_attacks: int = 100) -> dict[str, float]:
     guard = PromptInjectionGuard()
-    attack_spans: List[TextSpan] = []
+    attack_spans: list[TextSpan] = []
 
     for i in range(num_attacks):
         attack_type = i % 4
@@ -125,7 +130,7 @@ def benchmark_security_injection_guard(num_attacks: int = 100) -> Dict[str, floa
             )
 
     start_time = time.perf_counter()
-    clean_spans, audit = guard.scan_and_sanitize("bench-attack", attack_spans)
+    _clean_spans, audit = guard.scan_and_sanitize("bench-attack", attack_spans)
     elapsed_ms = (time.perf_counter() - start_time) * 1000.0
 
     interception_rate = (audit.stripped_spans_count / num_attacks) * 100.0
@@ -140,9 +145,9 @@ def benchmark_security_injection_guard(num_attacks: int = 100) -> Dict[str, floa
     }
 
 
-def benchmark_spatial_rag_retrieval(num_blocks: int = 500, num_queries: int = 100) -> Dict[str, float]:
+def benchmark_spatial_rag_retrieval(num_blocks: int = 500, num_queries: int = 100) -> dict[str, float]:
     index = SpatialIndex()
-    blocks: List[DocumentBlock] = []
+    blocks: list[DocumentBlock] = []
 
     topics = [
         "Distributed query engine execution planning and memory management",
@@ -178,7 +183,7 @@ def benchmark_spatial_rag_retrieval(num_blocks: int = 500, num_queries: int = 10
         "revenue growth EBITDA profitability",
     ]
 
-    latencies: List[float] = []
+    latencies: list[float] = []
     # Warmup
     for q in query_queries:
         engine.query(q, top_k=3)
@@ -206,7 +211,7 @@ def main() -> None:
     retrieval_results = benchmark_spatial_rag_retrieval()
 
     data = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "hardware": hw,
         "layout_parsing": parse_results,
         "prompt_injection_defense": security_results,
